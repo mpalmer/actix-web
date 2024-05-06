@@ -4,6 +4,7 @@
 
 - Minimum supported Rust version (MSRV) is now 1.72.
 - Various types from `awc`, such as `ClientRequest` and `ClientResponse`, are now re-exported.
+- TestServer can now be told to listen on an interface other than `localhost`, via the `TestServerConfig::listen_address()` method.
 
 ## 0.1.3
 
