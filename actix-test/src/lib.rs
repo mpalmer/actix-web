@@ -5,6 +5,7 @@
 //! real-world cases than using `init_service`, which skips HTTP encoding and decoding.
 //!
 //! # Examples
+//!
 //! ```
 //! use actix_web::{get, web, test, App, HttpResponse, Error, Responder};
 //!
@@ -145,6 +146,8 @@ where
         StreamType::Rustls021(_) => true,
         #[cfg(feature = "rustls-0_22")]
         StreamType::Rustls022(_) => true,
+        #[cfg(feature = "rustls-0_23")]
+        StreamType::Rustls023(_) => true,
     };
 
     let client_cfg = cfg.clone();
@@ -373,6 +376,48 @@ where
                             .rustls_0_22(config.clone())
                     }),
                 },
+                #[cfg(feature = "rustls-0_23")]
+                StreamType::Rustls023(config) => match cfg.tp {
+                    HttpVer::Http1 => builder.listen("test", tcp, move || {
+                        let app_cfg =
+                            AppConfig::__priv_test_new(false, local_addr.to_string(), local_addr);
+
+                        let fac = factory()
+                            .into_factory()
+                            .map_err(|err| err.into().error_response());
+
+                        HttpService::build()
+                            .client_request_timeout(timeout)
+                            .h1(map_config(fac, move |_| app_cfg.clone()))
+                            .rustls_0_23(config.clone())
+                    }),
+                    HttpVer::Http2 => builder.listen("test", tcp, move || {
+                        let app_cfg =
+                            AppConfig::__priv_test_new(false, local_addr.to_string(), local_addr);
+
+                        let fac = factory()
+                            .into_factory()
+                            .map_err(|err| err.into().error_response());
+
+                        HttpService::build()
+                            .client_request_timeout(timeout)
+                            .h2(map_config(fac, move |_| app_cfg.clone()))
+                            .rustls_0_23(config.clone())
+                    }),
+                    HttpVer::Both => builder.listen("test", tcp, move || {
+                        let app_cfg =
+                            AppConfig::__priv_test_new(false, local_addr.to_string(), local_addr);
+
+                        let fac = factory()
+                            .into_factory()
+                            .map_err(|err| err.into().error_response());
+
+                        HttpService::build()
+                            .client_request_timeout(timeout)
+                            .finish(map_config(fac, move |_| app_cfg.clone()))
+                            .rustls_0_23(config.clone())
+                    }),
+                },
             }
             .expect("test server could not be created");
 
@@ -444,6 +489,7 @@ enum HttpVer {
     Both,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone)]
 enum StreamType {
     Tcp,
@@ -455,6 +501,8 @@ enum StreamType {
     Rustls021(tls_rustls_0_21::ServerConfig),
     #[cfg(feature = "rustls-0_22")]
     Rustls022(tls_rustls_0_22::ServerConfig),
+    #[cfg(feature = "rustls-0_23")]
+    Rustls023(tls_rustls_0_23::ServerConfig),
 }
 
 /// Create default test server config.
@@ -486,7 +534,7 @@ impl TestServerConfig {
             tp: HttpVer::Both,
             stream: StreamType::Tcp,
             client_request_timeout: Duration::from_secs(5),
-            listen_address: "localhost".to_string(),
+            listen_address: "127.0.0.1".to_string(),
             port: 0,
             workers: 1,
             disable_redirects: false,
@@ -549,6 +597,13 @@ impl TestServerConfig {
         self
     }
 
+    /// Accepts secure connections via Rustls v0.23.
+    #[cfg(feature = "rustls-0_23")]
+    pub fn rustls_0_23(mut self, config: tls_rustls_0_23::ServerConfig) -> Self {
+        self.stream = StreamType::Rustls023(config);
+        self
+    }
+
     /// Sets client timeout for first request.
     pub fn client_request_timeout(mut self, dur: Duration) -> Self {
         self.client_request_timeout = dur;
@@ -557,7 +612,7 @@ impl TestServerConfig {
 
     /// Sets the address the server will listen on.
     ///
-    /// By default, only listens on `localhost`.
+    /// By default, only listens on `127.0.0.1`.
     pub fn listen_address(mut self, addr: impl Into<String>) -> Self {
         self.listen_address = addr.into();
         self

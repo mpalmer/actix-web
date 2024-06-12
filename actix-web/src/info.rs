@@ -23,14 +23,15 @@ fn unquote(val: &str) -> &str {
 
 /// Remove port and IPv6 square brackets from a peer specification.
 fn bare_address(val: &str) -> &str {
-    if val.starts_with("[") {
-        val.splitn(2, "]:")
+    if val.starts_with('[') {
+        val.split("]:")
             .next()
             .map(|s| s.trim_start_matches('[').trim_end_matches(']'))
-            // This shouldn't *actually* ever happen
+            // this indicates that the IPv6 address is malformed so shouldn't
+            // usually happen, but if it does, just return the original input
             .unwrap_or(val)
     } else {
-        val.splitn(2, ":").next().unwrap_or(val)
+        val.split(':').next().unwrap_or(val)
     }
 }
 
